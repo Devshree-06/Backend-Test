@@ -1,0 +1,8 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb+srv://devshree0602:Devs0606@filemanage.vw5gm.mongodb.net/
+      database: FileDownload
+
+server:
+  port: 8081
