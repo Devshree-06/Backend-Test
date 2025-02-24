@@ -35,4 +35,12 @@ public class FileController {
         producer.sendFileMessage(message);
         return ResponseEntity.ok("File test message is send to RabbitMQ..");
     }
+
+    @GetMapping("/download")
+    public Mono<ResponseEntity<?>> downloadFile(@RequestParam("docPath") String docPath){
+        log.info("File download api called");
+        return fileService.fileDownload(docPath)
+                .doOnNext(response-> log.info("Response: "+ response.getBody()))
+                .doOnError(error-> log.error("Error during file download",error));
+    }
 }

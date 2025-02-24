@@ -40,23 +40,50 @@ public class FileService {
     @Autowired
     CommonUtils commonUtils;
 
-    //User download file api method
+
+    //User download file api
     public Mono<ResponseEntity<?>> fileDownload(String filepath){
         File file = new File(filepath);
 
-        if(!clamAvService.isFileSafe(file)){
-            return Mono.just(ResponseEntity.ok(FileDownloadResponse.builder()
-                    .status("fail")
-                    .statusCode(100)
-                    .msg("File is corrupted")
-                    .build()));
-        }
+        //search by doc path for the document and if present, download the file.
+        return fileUploadRepository.findByDocPath(filepath)
+                .flatMap(fileExists-> {
+                    if (fileExists == null) {
+                        return Mono.just(ResponseEntity.ok(FileDownloadResponse.builder()
+                                .status("fail")
+                                .statusCode(100)
+                                .msg("The file does not exists")
+                                .build()));
+                    }
+                    if (!clamAvService.isFileSafe(file)) {
+                        return Mono.just(ResponseEntity.ok(FileDownloadResponse.builder()
+                                .status("fail")
+                                .statusCode(100)
+                                .msg("The file is corrupted. Cannot be downloaded")
+                                .build()));
+                    }
 
-        FileSystemResource resource = new FileSystemResource(file);
-        return Mono.just(ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,"attachment;filename=\"" + file.getName() + "\"")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(resource));
+                    Path fileType = file.toPath();
+                    String fileContent;
+                    try {
+                        fileContent = Files.probeContentType(fileType);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+
+                    FileSystemResource fileDownload = new FileSystemResource(file);
+                    DownloadData downloadData = new DownloadData();
+                    downloadData.setStatus("File Downloaded");
+                    downloadData.setDocType(fileContent);
+                    downloadData.setFileSize(file.length());
+                    downloadData.setDownloadedAt(LocalDateTime.now());
+
+                    return Mono.just(ResponseEntity.ok()
+                            .header(HttpHeaders.CONTENT_DISPOSITION,"attatchment;filename=\""+ file.getName() + "\"")
+                            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                            .body(fileDownload));
+                });
+
     }
 
     //User upload file api
@@ -70,9 +97,10 @@ public class FileService {
                             new UploadFileResponse("fail", 100, "File does not exist"), HttpStatus.OK));
                 }
 
-                String doc_id = UUID.randomUUID().toString(); //random doc id created for every new file uploaded
+//                Integer doc_id = Integer.valueOf(String.valueOf(UUID.randomUUID())); //random doc id created for every new file uploaded
+                String docId = UUID.randomUUID().toString();
                 UploadFile uploadFile = new UploadFile();
-                uploadFile.setDocId(doc_id);
+                uploadFile.setDocId(docId);
                 uploadFile.setStatus("Uploaded");
 
                 Path filePath = file.toPath();
